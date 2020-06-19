@@ -1,0 +1,19 @@
+agent: BerkeleyAgent
+
+train:
+  lr: 0.0002
+  n_epochs: 100
+
+tensorboard:
+  dir: "run/apple2orange"
+
+dataset:
+  name: "apple2orange"
+  input_size: 256
+  batch_size: 4
+
+cyclegan:
+  channels_img: 3
+  features_g: 32
+  blocks_g: 6
+  features_d: 32
