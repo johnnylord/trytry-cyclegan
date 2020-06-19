@@ -21,4 +21,5 @@ $ python main.py --config config/example.yml
 ```bash
 $ tensorboard --logdir="run" --host=0.0.0.0 --port=6006
 ```
-
+![appleorange](imgs/apple2orange.png)
+![orangeapple](imgs/orange2apple.png)
