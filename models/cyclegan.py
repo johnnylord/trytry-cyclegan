@@ -1,3 +1,4 @@
+import random
 import torch
 import torch.nn as nn
 import torch.nn.init as init
@@ -122,6 +123,38 @@ class Discriminator(nn.Module):
         return x
 
 
+class ImagePool:
+
+    def __init__(self, pool_size):
+        self.pool_size = pool_size
+        if self.pool_size > 0:
+            self.num_imgs = 0
+            self.images = []
+
+    def query(self, images):
+        if self.pool_size == 0:
+            return images
+
+        return_images = []
+        for image in images:
+            image = torch.unsqueeze(image.data, 0)
+            if self.num_imgs < self.pool_size:
+                self.num_imgs = self.num_imgs + 1
+                self.images.append(image)
+                return_images.append(image)
+            else:
+                p = random.uniform(0, 1)
+                if p > 0.5:
+                    random_id = random.randint(0, self.pool_size-1)
+                    tmp = self.images[random_id].clone()
+                    self.images[random_id] = image
+                    return_images.append(tmp)
+                else:
+                    return_images.append(image)
+        return_images = torch.cat(return_images, 0)
+        return return_images
+
+
 class CycleGAN:
     """Wrapper class for components in CycleGAN
 
@@ -131,7 +164,7 @@ class CycleGAN:
         netD_A: discriminator model for data in domain A
         netD_B: discriminator model for data in domain B
     """
-    def __init__(self, channels_img, features_g, blocks_g, features_d):
+    def __init__(self, channels_img, features_g, blocks_g, features_d, pool_size):
         self.netG_AB = Generator(channels_img=channels_img,
                                 features=features_g,
                                 n_blocks=blocks_g)
@@ -148,6 +181,10 @@ class CycleGAN:
         self.netG_AB.apply(self._init_weight)
         self.netD_A.apply(self._init_weight)
         self.netD_B.apply(self._init_weight)
+
+        ### Image Pools for generated images
+        self.image_pool_A = ImagePool(pool_size)
+        self.image_pool_B = ImagePool(pool_size)
 
     def to(self, device):
         self.netG_AB = self.netG_AB.to(device)

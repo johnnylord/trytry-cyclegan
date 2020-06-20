@@ -43,7 +43,8 @@ class BerkeleyAgent:
         self.cyclegan = CycleGAN(channels_img=config['cyclegan']['channels_img'],
                                 features_g=config['cyclegan']['features_g'],
                                 blocks_g=config['cyclegan']['blocks_g'],
-                                features_d=config['cyclegan']['features_d'])
+                                features_d=config['cyclegan']['features_d'],
+                                pool_size=config['cyclegan']['pool_size'])
         self.cyclegan.to(self.device)
         self.cyclegan.train()
 
@@ -109,6 +110,8 @@ class BerkeleyAgent:
             real_B_lossD = self.criterionD(real_B_label, real_label)
 
             # Discriminator loss (different distribution): D(a)^2
+            fake_A = self.cyclegan.image_pool_A.query(fake_A)
+            fake_B = self.cyclegan.image_pool_B.query(fake_B)
             fake_A_label = self.cyclegan.netD_A(fake_A.detach()).reshape(-1)
             fake_B_label = self.cyclegan.netD_B(fake_B.detach()).reshape(-1)
             fake_A_lossD = self.criterionD(fake_A_label, fake_label)
