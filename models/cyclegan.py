@@ -10,22 +10,24 @@ class ResidualBlock(nn.Module):
     def __init__(self, in_features, out_features):
         super().__init__()
         self.block = nn.Sequential(
-                nn.Conv2d(in_features, out_features, kernel_size=3, stride=1, padding=1),
-                nn.BatchNorm2d(out_features),
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(in_features, out_features, kernel_size=3, stride=1),
+                nn.InstanceNorm2d(out_features),
                 nn.ReLU(inplace=True),
-                nn.Conv2d(out_features, out_features, kernel_size=3, stride=1, padding=1),
-                nn.BatchNorm2d(out_features)
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(out_features, out_features, kernel_size=3, stride=1),
+                nn.InstanceNorm2d(out_features)
                 )
 
     def forward(self, x):
         residual = x
         x = self.block(x)
         assert x.shape == residual.shape
-        return F.relu(residual + x)
+        return residual + x
 
 
 class Generator(nn.Module):
-
+    """Resnet generator with 9 residual blocks"""
     def __init__(self, channels_img, features, n_blocks):
         super().__init__()
         self.channels_img = channels_img
@@ -35,16 +37,17 @@ class Generator(nn.Module):
         ### Encoder
         self.encoder = nn.Sequential(
                 # (batch_size x channels_img x 256 x 256)
-                nn.Conv2d(channels_img, features, kernel_size=7, stride=1, padding=3),
-                nn.BatchNorm2d(features),
+                nn.ReflectionPad2d(3),
+                nn.Conv2d(channels_img, features, kernel_size=7, stride=1),
+                nn.InstanceNorm2d(features),
                 nn.ReLU(inplace=True),
                 # (batch_size x features x 256 x 256)
                 nn.Conv2d(features, features*2, kernel_size=3, stride=2, padding=1),
-                nn.BatchNorm2d(features*2),
+                nn.InstanceNorm2d(features*2),
                 nn.ReLU(inplace=True),
                 # (batch_size x features*2 x 128 x 128)
                 nn.Conv2d(features*2, features*4, kernel_size=3, stride=2, padding=1),
-                nn.BatchNorm2d(features*4),
+                nn.InstanceNorm2d(features*4),
                 nn.ReLU(inplace=True),
                 # (batch_size x features*4 x 64 x 64)
                 )
@@ -56,15 +59,16 @@ class Generator(nn.Module):
         ### Decoder
         self.decoder = nn.Sequential(
                 # (batch_size x features*4 x 64 x 64)
-                nn.ConvTranspose2d(features*4, features*2, kernel_size=4, stride=2, padding=1),
-                nn.BatchNorm2d(features*2),
+                nn.ConvTranspose2d(features*4, features*2, kernel_size=3, stride=2, padding=1, output_padding=1),
+                nn.InstanceNorm2d(features*2),
                 nn.ReLU(inplace=True),
                 # (batch_size x features*2 x 128 x 128)
-                nn.ConvTranspose2d(features*2, features, kernel_size=4, stride=2, padding=1),
-                nn.BatchNorm2d(features),
+                nn.ConvTranspose2d(features*2, features, kernel_size=3, stride=2, padding=1, output_padding=1),
+                nn.InstanceNorm2d(features),
                 nn.ReLU(inplace=True),
                 # (batch_size x features x 256 x 256)
-                nn.Conv2d(features, channels_img, kernel_size=3, stride=1, padding=1),
+                nn.ReflectionPad2d(3),
+                nn.Conv2d(features, channels_img, kernel_size=7, stride=1),
                 nn.Tanh(),
                 # (batch_size x channels_img x 256 x 256)
                 )
@@ -84,7 +88,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-
+    """PatchGAN Discriminator"""
     def __init__(self, channels_img, features):
         super().__init__()
         self.channels_img = channels_img
@@ -94,26 +98,20 @@ class Discriminator(nn.Module):
                 # (batch_size x channels_img x 256 x 256)
                 nn.Conv2d(channels_img, features, kernel_size=4, stride=2, padding=1),
                 nn.LeakyReLU(0.2, inplace=True),
-                nn.MaxPool2d(2),
-                # (batch_size x features x 64 x 64)
+                # (batch_size x features x 128 x 128)
                 nn.Conv2d(features, features*2, kernel_size=4, stride=2, padding=1),
-                nn.BatchNorm2d(features*2),
+                nn.InstanceNorm2d(features*2),
                 nn.LeakyReLU(0.2, inplace=True),
-                # (batch_size x features*2 x 32 x 32)
+                # (batch_size x features*2 x 64 x 64)
                 nn.Conv2d(features*2, features*4, kernel_size=4, stride=2, padding=1),
-                nn.BatchNorm2d(features*4),
+                nn.InstanceNorm2d(features*4),
                 nn.LeakyReLU(0.2, inplace=True),
-                # (batch_size x features*4 x 16 x 16)
-                nn.Conv2d(features*4, features*8, kernel_size=4, stride=2, padding=1),
-                nn.BatchNorm2d(features*8),
+                # (batch_size x features*4 x 63 x 63)
+                nn.Conv2d(features*4, features*8, kernel_size=4, stride=1, padding=1),
+                nn.InstanceNorm2d(features*8),
                 nn.LeakyReLU(0.2, inplace=True),
-                # (batch_size x features*8 x 8 x 8)
-                nn.Conv2d(features*8, features*16, kernel_size=4, stride=2, padding=1),
-                nn.BatchNorm2d(features*16),
-                nn.LeakyReLU(0.2, inplace=True),
-                # (batch_size x features*16 x 4 x 4)
-                nn.Conv2d(features*16, 1, kernel_size=4, stride=2, padding=0),
-                nn.Sigmoid()
+                # (batch_size x features*16 x  x 8)
+                nn.Conv2d(features*8, 1, kernel_size=4, stride=1, padding=1)
                 # (batch_size x 1 x 1 x 1)
                 )
 
@@ -212,26 +210,28 @@ class CycleGAN:
 
     def _init_weight(self, m):
         if isinstance(m, nn.Conv2d):
-            init.xavier_uniform_(m.weight)
-            init.zeros_(m.bias)
+            init.normal_(m.weight.data, 0.0, 0.2)
+            init.zeros_(m.bias.data)
         elif isinstance(m, nn.ConvTranspose2d):
-            init.xavier_uniform_(m.weight)
-            init.zeros_(m.bias)
+            init.normal_(m.weight.data, 0.0, 0.2)
+            init.zeros_(m.bias.data)
 
 
 if __name__ == "__main__":
     # Hyperparameters
     channels_img = 3
     input_size = 256
-    features_g = 32
-    blocks_g = 6
+    features_g = 64
+    blocks_g = 9
     features_d = 64
+    pool_size = 50
 
     # Instantiate model
     cyclegan = CycleGAN(channels_img=channels_img,
                         features_g=features_g,
                         blocks_g=blocks_g,
-                        features_d=features_d)
+                        features_d=features_d,
+                        pool_size=pool_size)
 
     # Input data
     A_x = torch.rand(1, 3, 256, 256)
@@ -245,8 +245,10 @@ if __name__ == "__main__":
     A_y = cyclegan.netG_BA(B_x)
     B_x_rev = cyclegan.netG_AB(A_y)
 
-    # Discriminator Loss:
-    pass
+    # Discirminator A
+    cyclegan.netD_B(A_x)
+    cyclegan.netD_B(A_x_rev)
 
-    # Generator Loss:
-    pass
+    # Discriminator B
+    cyclegan.netD_B(B_x)
+    cyclegan.netD_B(B_x_rev)
